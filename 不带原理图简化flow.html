@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>划分器 v1.1｜Flow 简化流程图</title>
+  <style>
+    :root { color-scheme:light; --ink:#17243b; --muted:#52627a; --line:#d8e0eb; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#fff; color:var(--ink); font:16px/1.7 "Microsoft YaHei UI","Microsoft YaHei",sans-serif; }
+    main { max-width:1280px; margin:0 auto; padding:30px 22px 50px; }
+    header, section { background:#fff; border:1px solid var(--line); border-radius:14px; }
+    header { padding:24px 28px; margin-bottom:18px; }
+    h1 { margin:0 0 6px; font-size:27px; }
+    h2 { margin:0; font-size:19px; }
+    p { margin:8px 0; }
+    .sub,.hint { color:var(--muted); }
+    .tags { display:flex; flex-wrap:wrap; gap:8px; margin-top:13px; }
+    .tag { padding:3px 10px; border-radius:99px; background:#eff6ff; color:#1e40af; font-size:13px; }
+    section { overflow:hidden; }
+    .head { padding:17px 22px; border-bottom:1px solid var(--line); }
+    .body { padding:22px 12px; overflow:auto; background:#fff; }
+    .mermaid { min-width:850px; text-align:center; background:#fff; }
+    .hint { padding:0 22px 18px; font-size:14px; }
+    .error { display:none; margin:12px; padding:12px; border-radius:8px; color:#9f1239; background:#fff1f2; }
+    footer { margin-top:16px; color:var(--muted); font-size:13px; }
+    @media(max-width:650px) { main{padding:12px 8px 30px} header{padding:19px} h1{font-size:22px} .body{padding:15px 8px} }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>划分器 v1.1｜Flow 简化流程图</h1>
+    <p class="sub">一页看懂当前划分流程：只需输入网表；L3 由 DeepSeek 划分电压域，L2 结合功能识别、算法初划分与按需补划分，之后由本地算法完成 L1/L0。</p>
+    <div class="tags"><span class="tag">网表输入</span><span class="tag">L3 DeepSeek</span><span class="tag">L2 算法 + DeepSeek</span><span class="tag">L1/L0 本地处理</span></div>
+  </header>
+  <section>
+    <div class="head"><h2>当前 Flow</h2></div>
+    <div class="body"><pre class="mermaid">
+flowchart TB
+  A([输入网表<br/>.enet 或标准 JSON]) --> B[解析并规范化网表]
+  B --> C{dry-run？}
+  C -->|否| D[DeepSeek：L3 电压域划分]
+  C -->|是| D0[临时全部放入 low_voltage<br/>仅用于测试流程]
+  D --> E[按 L3 电压域拆分子网表]
+  D0 --> E
+  E --> F[DeepSeek：识别域内器件功能]
+  F --> G[本地确定性算法：L2 初划分]
+  G --> H{有锚定域和未解决小器件？}
+  H -->|是，且非 dry-run| I[DeepSeek：补划分小器件<br/>形成独立辅助 L2 簇]
+  H -->|否| J[保留算法结果与回退归属]
+  I --> K[合并并校验 L2 归属]
+  J --> K
+  K --> L[本地 L1：结合拓扑与功能评分配对<br/>只在同一 L2 域内成簇]
+  L --> M[生成层级：L3 → L2 → L1]
+  M --> N[展开 L0：每个器件一个单器件簇<br/>识别连接器]
+  N --> O{所有器件均完整且唯一归属？}
+  O -->|否| X[记录错误并停止]
+  O -->|是| P[导出层级 JSON、CSV 与运行统计]
+  P --> Q([完成])
+  classDef input fill:#eff6ff,stroke:#60a5fa,color:#17243b;
+  classDef model fill:#fff7ed,stroke:#fb923c,color:#17243b;
+  classDef local fill:#ecfdf5,stroke:#34d399,color:#17243b;
+  classDef output fill:#f5f3ff,stroke:#a78bfa,color:#17243b;
+  class A,B input; class D,F,I model; class G,K,L,M,N local; class P output;
+    </pre><div class="error">流程图加载失败。图表源码内嵌于此 HTML；请确认网络可用后刷新页面。</div></div>
+    <div class="hint">要点：L2 的 DeepSeek 功能识别与小器件补划分是两项独立任务；补划分只在存在合适锚定域和候选小器件时执行。L1 不调用模型，L0 负责单器件展开。</div>
+  </section>
+  <footer>白色背景 · 简化总览 · 详细版见《当前Flow完整流程图.html》</footer>
+</main>
+<script type="module">
+  const block = document.querySelector('.mermaid');
+  try {
+    const { default: mermaid } = await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs');
+    mermaid.initialize({ startOnLoad:false, theme:'base', securityLevel:'loose', flowchart:{ htmlLabels:true, curve:'basis', useMaxWidth:true, nodeSpacing:34, rankSpacing:42 }, themeVariables:{ background:'#ffffff', mainBkg:'#ffffff', fontFamily:'Microsoft YaHei, sans-serif', primaryColor:'#eff6ff', primaryTextColor:'#17243b', primaryBorderColor:'#60a5fa', lineColor:'#64748b', secondaryColor:'#ecfdf5', tertiaryColor:'#fff7ed' } });
+    await mermaid.run({ nodes:[block] });
+  } catch (error) {
+    block.parentElement.querySelector('.error').style.display = 'block';
+    console.error('Mermaid render failed:', error);
+  }
+</script>
+</body>
+</html>

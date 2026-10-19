@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>划分器 v1.0｜Flow 简化版</title>
+  <style>
+    :root { --ink:#18263d; --muted:#5c6c83; --line:#ccd8e7; --blue:#2463d3; --blue-bg:#edf5ff; --orange:#b85c16; --orange-bg:#fff5e9; --green:#18794e; --green-bg:#eaf8f0; --purple:#6545a5; --purple-bg:#f3efff; }
+    * { box-sizing:border-box }
+    body { margin:0; padding:28px 16px 48px; background:#f1f5fa; color:var(--ink); font:15px/1.55 "Microsoft YaHei UI","Microsoft YaHei",sans-serif }
+    main { width:min(100%,900px); margin:0 auto }
+    header { text-align:center; margin-bottom:22px }
+    h1 { margin:0; font-size:27px }
+    header p { margin:5px 0 0; color:var(--muted) }
+    .flow { display:flex; flex-direction:column; align-items:stretch; gap:0 }
+    .node { border:1px solid var(--line); border-radius:14px; padding:14px 20px; background:white; box-shadow:0 4px 14px #1f35550a }
+    .node h2 { margin:0 0 3px; font-size:18px }
+    .node p { margin:0; color:var(--muted) }
+    .node.input { border-color:#91b9f1; background:var(--blue-bg) }
+    .node.model { border-color:#f0bd83; background:var(--orange-bg) }
+    .node.local { border-color:#86c9a7; background:var(--green-bg) }
+    .node.output { border-color:#b6a1e2; background:var(--purple-bg) }
+    .arrow { align-self:center; color:#718096; height:35px; display:flex; align-items:center; font-size:23px; line-height:1 }
+    .l2 { padding:16px 18px 18px; border:2px solid #e5a65f; border-radius:17px; background:#fffdfa }
+    .l2-title { display:flex; justify-content:space-between; gap:10px; align-items:baseline; flex-wrap:wrap }
+    .l2-title h2 { margin:0; font-size:19px }
+    .l2-title span { font-size:12px; color:var(--muted) }
+    .substeps { margin-top:13px; display:grid; grid-template-columns:1fr 1fr; gap:9px }
+    .sub { border:1px solid var(--line); border-radius:10px; padding:10px 12px; background:#fff }
+    .sub b { display:block; margin-bottom:2px; font-size:14px }
+    .sub small { display:block; color:var(--muted); font-size:12px; line-height:1.45 }
+    .sub.deep { border-color:#f2c493; background:#fff8ef }
+    .sub.algo { border-color:#a4d6ba; background:#f1fbf5 }
+    .sub.qwen { border-color:#c2b0ea; background:#f7f4ff }
+    .sub.fallback { border-color:#c9d5e4; background:#f7f9fc }
+    .condition { margin-top:10px; padding:8px 11px; border-radius:9px; color:#58677c; background:#f3f6fa; font-size:12px }
+    .parallel { text-align:center; margin-top:8px; color:#4e617a; font-size:12px }
+    .checks { display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px }
+    .checks span { border:1px solid #b6a1e2; border-radius:99px; background:#faf8ff; color:#514078; padding:4px 11px; font-size:12px }
+    footer { margin-top:18px; text-align:center; color:var(--muted); font-size:12px }
+    @media(max-width:620px) { body{padding:20px 10px 32px} h1{font-size:22px}.node{padding:12px 14px}.substeps{grid-template-columns:1fr}.arrow{height:28px} }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>划分器 v1.0｜Flow 简化版</h1>
+    <p>从电路网表到逐器件层级结果</p>
+  </header>
+  <div class="flow">
+    <article class="node input">
+      <h2>输入与标准化</h2>
+      <p>读取 JSON / EasyEDA .enet；可选提供原理图图片</p>
+    </article>
+    <div class="arrow" aria-hidden="true">↓</div>
+    <article class="node model">
+      <h2>L3｜电压域划分</h2>
+      <p>DeepSeek 按电压阈值把器件分到高压域或低压域</p>
+    </article>
+    <div class="arrow" aria-hidden="true">↓</div>
+    <article class="node local">
+      <h2>分域处理</h2>
+      <p>高压域和低压域分别处理；不同域可并发，结果不会跨域混合</p>
+      <div class="parallel">每个 L3 电压域独立执行下面的 L2 → L1</div>
+    </article>
+    <div class="arrow" aria-hidden="true">↓</div>
+    <section class="l2">
+      <div class="l2-title"><h2>L2｜功能域划分</h2><span>每个 L3 域各自运行一次</span></div>
+      <div class="substeps">
+        <div class="sub deep"><b>① DeepSeek 功能识别</b><small>识别域内器件功能，为后续分组提供功能信息</small></div>
+        <div class="sub algo"><b>② 本地确定性算法</b><small>分析拓扑和规则，建立锚定的大器件功能域</small></div>
+        <div class="sub qwen"><b>③ 有图片和候选小器件 → 千问识图</b><small>把尚未归属的小器件放入已有大器件域；不新建域、不移动大器件</small></div>
+        <div class="sub fallback"><b>没有触发千问 → DeepSeek 补簇或保留</b><small>有可补的小器件时形成辅助簇；无候选或无锚点时不强行补分</small></div>
+      </div>
+      <div class="condition">若千问会覆盖候选器件最终归属，就跳过不会被采用的 DeepSeek 补簇请求。</div>
+    </section>
+    <div class="arrow" aria-hidden="true">↓</div>
+    <article class="node local">
+      <h2>L1｜细功能簇</h2>
+      <p>在各自 L2 域内，结合器件连接关系和功能相似度形成更细的簇；未配对器件单独保留</p>
+    </article>
+    <div class="arrow" aria-hidden="true">↓</div>
+    <article class="node local">
+      <h2>L0｜单器件簇</h2>
+      <p>每个元件单独成为一个 L0 簇，并识别连接器；连接器标 True，其他留空</p>
+    </article>
+    <div class="arrow" aria-hidden="true">↓</div>
+    <article class="node output">
+      <h2>校验并输出</h2>
+      <p>确认每个器件在层级中归属完整且唯一，然后生成层级结果与 CSV</p>
+      <div class="checks"><span>完整层级 JSON</span><span>逐器件总表 CSV</span><span>L3 / L2 / L1 / L0 分层 CSV</span><span>各层耗时记录</span></div>
+    </article>
+  </div>
+  <footer>简化图省略了请求重试、格式修复、审计文件等异常处理细节；详细分支见“当前Flow完整流程图.html”。</footer>
+</main>
+</body>
+</html>
